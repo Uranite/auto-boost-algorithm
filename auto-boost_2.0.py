@@ -44,7 +44,7 @@ fast_av1an_command = f'av1an -i "{sys.argv[1]}" --temp "{sys.argv[1][:-4]}/temp/
                     --verbose -k -m lsmash \
                     -c mkvmerge --sc-downscale-height 720 \
                     --set-thread-affinity 2 -e svt-av1 --force -v \" \
-                    --preset 9 --crf {og_cq} --lp 2 \
+                    --preset 9 --enable-tf 0 --crf {og_cq} --lp 2 \
                     --keyint -1 --fast-decode 1 --color-primaries 1 \
                     --transfer-characteristics 1 --matrix-coefficients 1 \" \
                     -w {WORKERS} \
