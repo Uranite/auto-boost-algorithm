@@ -53,7 +53,7 @@ def fast_pass_encode(input_file, og_cq):
     p = subprocess.Popen(fast_pass_command, shell=True)
     exit_code = p.wait()
     if exit_code != 0:
-        print("Av1an encountered an error, exiting.")
+        print("Av1an encountered an error during fast pass encode, exiting.")
         exit(-2)
 
 
