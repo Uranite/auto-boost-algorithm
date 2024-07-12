@@ -50,7 +50,7 @@ def fast_pass_encode(input_file, og_cq):
                         --transfer-characteristics 1 --matrix-coefficients 1" \
                         -w {WORKERS} \
                         -o "{input_file[:-4]}_fastpass.mkv"'
-    p = subprocess.Popen(fast_av1an_command, shell=True)
+    p = subprocess.Popen(fast_pass_command, shell=True)
     exit_code = p.wait()
     if exit_code != 0:
         print("Av1an encountered an error, exiting.")
