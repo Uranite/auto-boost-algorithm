@@ -63,6 +63,7 @@ def final_pass_encode(input_file, scenes_loc):
                         -v="--keyint -1 --tune 3 --enable-tf 0 --crf 30 --preset 4 \
                         --color-primaries 1 --transfer-characteristics 1 \
                         --matrix-coefficients 1" -m lsmash -c mkvmerge --verbose -w {WORKERS}'
+    print(f"Final pass command: {final_pass_command}")
     p = subprocess.Popen(final_pass_command, shell=True)
     exit_code = p.wait()
     if exit_code != 0:
