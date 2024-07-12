@@ -139,7 +139,7 @@ def main():
     br = 10  # maximum CQ change from original
 
     if not os.path.exists(f"{input_file[:-4]}_fastpass.mkv"):
-        execute_fast_av1an_command(input_file, og_cq)
+        fast_pass_encode(input_file, og_cq)
 
     scenes_loc = f"{input_file[:-4]}/temp/scenes.json"
     ranges = get_ranges(scenes_loc)
@@ -147,7 +147,7 @@ def main():
     source_clip, encoded_clip = process_video_files(input_file, scenes_loc, og_cq, br)
 
     skip = 10  # amount of skipped frames
-    total_ssim_scores, percentile_5_total = compute_ssim_scores(
+    total_ssim_scores, percentile_5_total = calculate_ssim2_scores(
         ranges, source_clip, encoded_clip, skip
     )
 
@@ -157,7 +157,7 @@ def main():
     adjust_cq(ranges, percentile_5_total, average, og_cq, br, scenes_loc)
 
     if not os.path.exists(f"{input_file[:-4]}_finalpass.mkv"):
-        execute_final_pass_encode(input_file, scenes_loc)
+        final_pass_encode(input_file, scenes_loc)
 
 
 if __name__ == "__main__":
