@@ -59,10 +59,10 @@ def fast_pass_encode(input_file, og_cq):
 
 def final_pass_encode(input_file, scenes_loc):
     final_pass_command = f'av1an -i "{input_file}" -o "{input_file[:-4]}_finalpass.mkv" \
-                        --zones "{scenes_loc[:-11]}zones.txt" -e svt-av1 \
+                        --sc-downscale-height 360 --zones "{scenes_loc[:-11]}zones.txt" -e svt-av1 \
                         -v="--keyint -1 --tune 3 --enable-tf 0 --crf 30 --preset 4 \
                         --color-primaries 1 --transfer-characteristics 1 \
-                        --matrix-coefficients 1" -m lsmash -c mkvmerge --verbose -w {WORKERS}'
+                        --matrix-coefficients 1 --lp 2" -m lsmash -c mkvmerge --verbose -w {WORKERS}'
     print(f"Final pass command: {final_pass_command}")
     p = subprocess.Popen(final_pass_command, shell=True)
     exit_code = p.wait()
@@ -142,21 +142,23 @@ def main():
         fast_pass_encode(input_file, og_cq)
 
     scenes_loc = f"{input_file[:-4]}/temp/scenes.json"
-    ranges = get_ranges(scenes_loc)
 
-    source_clip, encoded_clip = process_video_files(input_file, scenes_loc, og_cq, br)
+    if not os.path.exists(f"{scenes_loc[:-11]}zones.txt"):
+        ranges = get_ranges(scenes_loc)
 
-    skip = 10  # amount of skipped frames
-    total_ssim_scores, percentile_5_total = calculate_ssim2_scores(
-        ranges, source_clip, encoded_clip, skip
-    )
+        source_clip, encoded_clip = process_video_files(input_file, scenes_loc, og_cq, br)
 
-    (average, _) = calculate_standard_deviation(total_ssim_scores)
-    print(f"Median score:  {average}\n\n")
+        skip = 10  # amount of skipped frames
+        total_ssim_scores, percentile_5_total = calculate_ssim2_scores(
+            ranges, source_clip, encoded_clip, skip
+        )
 
-    adjust_cq(ranges, percentile_5_total, average, og_cq, br, scenes_loc)
+        (average, _) = calculate_standard_deviation(total_ssim_scores)
+        print(f"Median score:  {average}\n\n")
 
-    if not os.path.exists(f"{input_file[:-4]}_finalpass.mkv"):
+        adjust_cq(ranges, percentile_5_total, average, og_cq, br, scenes_loc)
+
+    if os.path.exists(f"{scenes_loc[:-11]}zones.txt") and not os.path.exists(f"{input_file[:-4]}_finalpass.mkv"):
         final_pass_encode(input_file, scenes_loc)
 
 
