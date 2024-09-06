@@ -93,7 +93,7 @@ for i in range(len(ranges)-1):
 print(f'Median score:  {average}\n\n')
 
 for i in range(len(ranges)-1):
-    new_cq = og_cq - ceil((1.0 - (percentile_5_total[i]/average)) / 0.5 * 40) / 4 # trust me bro
+    new_cq = og_cq - ceil((1.0 - (percentile_5_total[i] / average)) * 40 * 4) / 4 # trust me bro
 
     if new_cq < og_cq-br: # set lowest allowed cq
         new_cq = og_cq-br
