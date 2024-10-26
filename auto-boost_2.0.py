@@ -4,6 +4,9 @@ import json
 import sys
 import subprocess
 import vapoursynth as vs
+import os
+import psutil
+
 core = vs.core
 
 if "--help" in sys.argv[1:]:
@@ -38,15 +41,22 @@ def calculate_standard_deviation(score_list: list[int]):
     average = sum(filtered_score_list)/len(filtered_score_list)
     return (average, sorted_score_list[len(filtered_score_list)//20])
 
-fast_av1an_command = f'av1an -i "{sys.argv[1]}" --temp "{sys.argv[1][:-4]}/temp/" -y \
-                    --verbose --keep --split-method av-scenechange -m lsmash \
-                    --min-scene-len 12 -c mkvmerge --sc-downscale-height 480 \
+WORKERS = psutil.cpu_count(logical=False)
+
+input_path = os.path.abspath(sys.argv[1])
+base_path = os.path.splitext(input_path)[0]
+temp_dir = os.path.join(base_path, "temp")
+
+# Change the colors and workers as necessary
+fast_av1an_command = f'av1an -i "{input_path}" --temp "{temp_dir}" -y \
+                    --verbose --keep -m lsmash \
+                    -c mkvmerge --sc-downscale-height 480 \
                     --set-thread-affinity 2 -e svt-av1 --force -v \" \
-                    --preset 9 --crf {og_cq} --rc 0 --film-grain 0 --lp 2 \
+                    --preset 9 --crf {og_cq} --film-grain 0 --lp 2 \
                     --scm 0 --keyint 0 --fast-decode 1 --color-primaries 1 \
                     --transfer-characteristics 1 --matrix-coefficients 1 \" \
-                    --pix-format yuv420p10le -x 240  -w {WORKERS} \
-                    -o "{sys.argv[1][:-4]}_fastpass.mkv"'
+                    --pix-format yuv420p10le -w {WORKERS} \
+                    -o "{base_path}_fastpass.mkv"'
 
 p = subprocess.Popen(fast_av1an_command, shell=True)
 exit_code = p.wait()
@@ -55,11 +65,11 @@ if exit_code != 0:
     print("Av1an encountered an error, exiting.")
     exit(-2)
 
-scenes_loc = f"{sys.argv[1][:-4]}/temp/scenes.json"
+scenes_loc = os.path.join(temp_dir, "scenes.json")
 ranges = get_ranges(scenes_loc)
 
-src = core.lsmas.LWLibavSource(source=sys.argv[1], cache=0)
-enc = core.lsmas.LWLibavSource(source=f"{sys.argv[1][:-4]}_fastpass.mkv", cache=0)
+src = core.lsmas.LWLibavSource(source=input_path, cache=0)
+enc = core.lsmas.LWLibavSource(source=f"{base_path}_fastpass.mkv", cache=0)
 
 print(f"source: {len(src)} frames")
 print(f"encode: {len(enc)} frames")
@@ -90,8 +100,8 @@ for i in range(len(ranges)-1):
 (average, percentile_5) = calculate_standard_deviation(total_ssim_scores)
 print(f'Median score:  {average}\n\n')
 
+zones_file = os.path.join(temp_dir, "zones.txt")
 for i in range(len(ranges)-1):
-
     new_cq = og_cq - ceil((1.0 - (percentile_5_total[i]/average)) / 0.5 * 10) # trust me bro
 
     if new_cq < og_cq-br: # set lowest allowed cq
@@ -103,6 +113,6 @@ for i in range(len(ranges)-1):
     print(f'Enc:  [{ranges[i]}:{ranges[i+1]}]\n'
             f'Chunk 5th percentile: {percentile_5_total[i]}\n'
             f'Adjusted CRF: {new_cq}\n\n')
-    zones_txt(ranges[i], ranges[i+1], new_cq, f"{scenes_loc[:-11]}zones.txt")
+    zones_txt(ranges[i], ranges[i+1], new_cq, zones_file)
 
 # yes, this is messier than the 1.0 code, laziness won over me, deal with it
