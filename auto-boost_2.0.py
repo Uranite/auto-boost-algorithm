@@ -80,7 +80,7 @@ print(f"encode: {len(encoded_clip)} frames")
 percentile_5_total = []
 total_ssim_scores = []
 
-skip = 11  # amount of skipped frames
+skip = 10  # amount of skipped frames
 
 for i in range(len(ranges) - 1):
     cut_source_clip = source_clip[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=0)
