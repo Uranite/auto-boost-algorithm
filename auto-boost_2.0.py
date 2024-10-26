@@ -15,8 +15,8 @@ if "--help" in sys.argv[1:]:
 else:
     pass
 
-og_cq = int(sys.argv[2]) # CQ to start from
-br = 10 # maximum CQ change from original
+og_cq = float(sys.argv[2]) # CQ to start from
+br = 10.0 # maximum CQ change from original
 
 def get_ranges(scenes):
      ranges = []
@@ -47,7 +47,7 @@ input_path = os.path.abspath(sys.argv[1])
 base_path = os.path.splitext(input_path)[0]
 temp_dir = os.path.join(base_path, "temp")
 
-# Change the colors and workers as necessary
+# Adjust colors and workers as necessary
 fast_av1an_command = f'av1an -i "{input_path}" --temp "{temp_dir}" -y \
                     --verbose --keep -m lsmash \
                     -c mkvmerge --sc-downscale-height 480 \
@@ -74,18 +74,15 @@ enc = core.lsmas.LWLibavSource(source=f"{base_path}_fastpass.mkv", cache=0)
 print(f"source: {len(src)} frames")
 print(f"encode: {len(enc)} frames")
 
-source_clip = src.resize.Bicubic(format=vs.RGBS, matrix_in_s='709').fmtc.transfer(transs="srgb", transd="linear", bits=32)
-encoded_clip = enc.resize.Bicubic(format=vs.RGBS, matrix_in_s='709').fmtc.transfer(transs="srgb", transd="linear", bits=32)
-
 percentile_5_total = []
 total_ssim_scores: list[int] = []
 
 skip = 10 # amount of skipped frames
 
 for i in range(len(ranges)-1):
-    cut_source_clip = source_clip[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=0)
-    cut_encoded_clip = encoded_clip[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=0)
-    result = cut_source_clip.ssimulacra2.SSIMULACRA2(cut_encoded_clip)
+    cut_source_clip = src[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=0)
+    cut_encoded_clip = enc[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=0)
+    result = cut_source_clip.vszip.Metrics(cut_encoded_clip, mode=0)
     chunk_ssim_scores: list[int] = []
 
     for index, frame in enumerate(result.frames()):
@@ -102,7 +99,8 @@ print(f'Median score:  {average}\n\n')
 
 zones_file = os.path.join(temp_dir, "zones.txt")
 for i in range(len(ranges)-1):
-    new_cq = og_cq - ceil((1.0 - (percentile_5_total[i]/average)) / 0.5 * 10) # trust me bro
+    # Functionally the same as Trix's but quarter-step
+    new_cq = og_cq - ceil((1.0 - (percentile_5_total[i]/average)) * 20 * 4) / 4 # 20 is a scale factor, increase it for more aggressive cq adjustment
 
     if new_cq < og_cq-br: # set lowest allowed cq
         new_cq = og_cq-br
