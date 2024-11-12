@@ -50,12 +50,12 @@ temp_dir = os.path.join(base_path, "temp")
 # Adjust colors and workers as necessary
 fast_av1an_command = f'av1an -i "{input_path}" --temp "{temp_dir}" -y \
                     --verbose --keep -m lsmash \
-                    -c mkvmerge --sc-downscale-height 480 \
+                    -c mkvmerge --sc-downscale-height 720 \
                     --set-thread-affinity 2 -e svt-av1 --force -v \" \
-                    --preset 9 --crf {og_cq} --film-grain 0 --lp 2 \
+                    --preset 9 --crf {og_cq} --lp 2 \
                     --scm 0 --keyint 0 --fast-decode 1 --color-primaries 1 \
                     --transfer-characteristics 1 --matrix-coefficients 1 \" \
-                    --pix-format yuv420p10le -w {WORKERS} \
+                    -w {WORKERS} \
                     -o "{base_path}_fastpass.mkv"'
 
 p = subprocess.Popen(fast_av1an_command, shell=True)
