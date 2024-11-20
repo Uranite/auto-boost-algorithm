@@ -278,11 +278,10 @@ def calculate_std_dev(score_list: list[int]):
     """
 
     filtered_score_list = [score for score in score_list if score >= 0]
-    sorted_score_list = sorted(filtered_score_list)
-    average = sum(filtered_score_list)/len(filtered_score_list)
-    percentile_5 = sorted_score_list[len(filtered_score_list)//20]
-    percentile_95 = sorted_score_list[int (len(filtered_score_list)//(20/19))]
-    return (average, percentile_5, percentile_95)
+    average = np.mean(filtered_score_list)
+    percentile_5 = np.percentile(filtered_score_list, 5)
+    percentile_95 = np.percentile(filtered_score_list, 95)
+    return average, percentile_5, percentile_95
 
 def generate_zones(ranges: list, percentile_5_total: list, average: int, crf: float, zones_txt_path: str):
     """
