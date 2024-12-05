@@ -526,6 +526,7 @@ match stage:
         calculate_metrics(src_file, output_file, tmp_dir, ranges, skip, metrics)
         zones = int(args.zones)
         zones_txt_path = calculate_zones(tmp_dir, ranges, zones, crf)  # Use the returned path
+        # todo: toggle and parameters
         if zones_txt_path.exists():
             preset = '4'
             output_file = output_dir / f"{src_file.stem}_finalpass.mkv"
