@@ -12,6 +12,7 @@ import psutil
 import shutil
 import platform
 import vapoursynth as vs
+import numpy as np
 core = vs.core
 core.max_cache_size = 1024
 
@@ -69,17 +70,17 @@ def get_ranges(scenes: str) -> list[int]:
     return ranges
 
 def fast_pass(
-        input_file: str, output_file: str, tmp_dir: str, preset: int, crf: float, workers: int
+        input_file: Path, output_file: Path, tmp_dir: Path, preset: int, crf: float, workers: int
 ):
     """
     Quick fast-pass using Av1an
 
     :param input_file: path to input file
-    :type input_file: str
+    :type input_file: Path
     :param output_file: path to output file
-    :type output_file: str
+    :type output_file: Path
     :param tmp_dir: path to temporary directory
-    :type tmp_dir: str
+    :type tmp_dir: Path
     :param preset: encoder preset
     :type preset: int
     :param crf: target CRF
@@ -95,14 +96,56 @@ def fast_pass(
         '-y',
         '--verbose',
         '--keep',
-        '-m', 'lsmash',
+        '-m', 'ffms2',
         '-c', 'mkvmerge',
-        '--min-scene-len', '24',
+        '--sc-downscale-height', '720',
+        '--set-thread-affinity', '2',
+        '-e', 'svt-av1',
+        '-v', f'--preset {preset} --crf {crf:.2f} --lp 2 --keyint 0 --fast-decode 1 --color-primaries 1 --transfer-characteristics 1 --matrix-coefficients 1',
+        '-w', str(workers),
+        '-o', output_file
+    ]
+
+    try:
+        subprocess.run(fast_av1an_command, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+       print(f"Av1an encountered an error:\n{e}")
+       exit(1)
+
+def final_pass(
+        input_file: Path, output_file: Path, tmp_dir: Path, preset: int, crf: float, workers: int, zones_txt_path: Path
+):
+    """
+    Quick fast-pass using Av1an
+
+    :param input_file: path to input file
+    :type input_file: Path
+    :param output_file: path to output file
+    :type output_file: Path
+    :param tmp_dir: path to temporary directory
+    :type tmp_dir: Path
+    :param preset: encoder preset
+    :type preset: int
+    :param crf: target CRF
+    :type crf: float
+    :param workers: number of workers
+    :type workers: int
+    """
+
+    fast_av1an_command = [
+        'av1an',
+        '-i', input_file,
+        '--zones', zones_txt_path,
+        '-y',
+        '--verbose',
+        '--keep',
+        '-m', 'ffms2',
+        '-c', 'mkvmerge',
         '--sc-downscale-height', '720',
         '--set-thread-affinity', '2',
         '-e', 'svt-av1',
         '--force',
-        '-v', f'--preset {preset} --crf {crf:.2f} --lp 2 --scm 0 --keyint 0 --fast-decode 1 --color-primaries 1 --transfer-characteristics 1 --matrix-coefficients 1',
+        '-v', f'--preset {preset} --crf {crf:.2f} --lp 2 --keyint 0 --color-primaries 1 --transfer-characteristics 1 --matrix-coefficients 1',
         '-w', str(workers),
         '-o', output_file
     ]
@@ -270,18 +313,16 @@ def get_ssimu2(ssimu2_txt_path):
 
 def calculate_std_dev(score_list: list[int]):
     """
-    Takes a list of metrics scores and returns the associated arithmetic mean,
-    5th percentile and 95th percentile scores.
+    Takes a list of metric scores and returns the associated arithmetic mean,
+    5th percentile, and 95th percentile scores.
 
     :param score_list: list of SSIMU2 scores
     :type score_list: list
     """
-
-    filtered_score_list = [score for score in score_list if score >= 0]
-    sorted_score_list = sorted(filtered_score_list)
-    average = sum(filtered_score_list)/len(filtered_score_list)
-    percentile_5 = sorted_score_list[len(filtered_score_list)//20]
-    percentile_95 = sorted_score_list[int (len(filtered_score_list)//(20/19))]
+    filtered_score_list = np.array([score for score in score_list if score >= 0])
+    average = np.mean(filtered_score_list)
+    percentile_5 = np.percentile(filtered_score_list, 5)
+    percentile_95 = np.percentile(filtered_score_list, 95)
     return (average, percentile_5, percentile_95)
 
 def generate_zones(ranges: list, percentile_5_total: list, average: int, crf: float, zones_txt_path: str):
@@ -493,6 +534,12 @@ match stage:
         zones = int(args.zones)
         crf = float(args.quality)
         calculate_zones(tmp_dir, ranges, zones, crf)
+        if zones_txt_path.exists():
+            preset = '4'
+            output_file = output_dir / f"{src_file.stem}_finalpass.mkv"
+            final_pass(src_file, output_file, tmp_dir, preset, crf, workers, zones_txt_path)
+        else:
+            print(f"Zones file not found at {zones_txt_path}. Final pass encode skipped.")
     case _:
         print(f"Stage argument invalid, exiting.")
         exit(-2)
