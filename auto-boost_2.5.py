@@ -407,6 +407,7 @@ def calculate_zones(tmp_dir, ranges, zones, cq):
             print(f'5th Percentile:  {ssimu2_percentile_5}')
             print(f'95th Percentile:  {ssimu2_percentile_95}\n')
             generate_zones(ranges, ssimu2_percentile_5_total, ssimu2_average, cq, ssimu2_zones_txt_path)
+            return ssimu2_zones_txt_path
 
         case 2:
             xpsnr_txt_path = output_dir / f"{src_file.stem}_xpsnr.log"
@@ -433,6 +434,7 @@ def calculate_zones(tmp_dir, ranges, zones, cq):
             print(f'5th Percentile:  {xpsnr_percentile_5}')
             print(f'95th Percentile:  {xpsnr_percentile_95}\n')
             generate_zones(ranges, xpsnr_percentile_5_total, xpsnr_average, cq, xpsnr_zones_txt_path)
+            return xpsnr_zones_txt_path
 
         case 3:
             ssimu2_txt_path = output_dir / f"{src_file.stem}_ssimu2.log"
@@ -467,6 +469,7 @@ def calculate_zones(tmp_dir, ranges, zones, cq):
             print(f'5th Percentile:  {multiplied_percentile_5}')
             print(f'95th Percentile:  {multiplied_percentile_95}\n')
             generate_zones(ranges, multiplied_percentile_5_total, multiplied_average, cq, multiplied_zones_txt_path)
+            return multiplied_zones_txt_path
 
 
         case 4:
@@ -508,6 +511,7 @@ def calculate_zones(tmp_dir, ranges, zones, cq):
             print(f'5th Percentile:  {minimum_percentile_5}')
             print(f'95th Percentile:  {minimum_percentile_95}\n')
             generate_zones(ranges, minimum_percentile_5_total, minimum_average, cq, minimum_zones_txt_path)
+            return minimum_zones_txt_path
 
 match stage:
     case 0:
@@ -532,8 +536,9 @@ match stage:
     case 3:
         ranges = get_ranges(scenes_file)
         zones = int(args.zones)
+        workers = args.workers
         crf = float(args.quality)
-        calculate_zones(tmp_dir, ranges, zones, crf)
+        zones_txt_path = calculate_zones(tmp_dir, ranges, zones, crf)  # Use the returned path
         if zones_txt_path.exists():
             preset = '4'
             output_file = output_dir / f"{src_file.stem}_finalpass.mkv"
