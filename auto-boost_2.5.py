@@ -101,6 +101,7 @@ def fast_pass(
         '--sc-downscale-height', '720',
         '--set-thread-affinity', '2',
         '-e', 'svt-av1',
+        '--resume',
         '-v', f'--preset {preset} --crf {crf:.2f} --lp 2 --keyint 0 --fast-decode 1 --color-primaries 1 --transfer-characteristics 1 --matrix-coefficients 1',
         '-w', str(workers),
         '-o', output_file
@@ -135,6 +136,7 @@ def final_pass(
     fast_av1an_command = [
         'av1an',
         '-i', input_file,
+        '--temp', tmp_dir,
         '--zones', zones_txt_path,
         '-y',
         '--verbose',
@@ -144,7 +146,7 @@ def final_pass(
         '--sc-downscale-height', '720',
         '--set-thread-affinity', '2',
         '-e', 'svt-av1',
-        '--force',
+        '--resume',
         '-v', f'--preset {preset} --crf {crf:.2f} --lp 2 --keyint 0 --color-primaries 1 --transfer-characteristics 1 --matrix-coefficients 1',
         '-w', str(workers),
         '-o', output_file
@@ -527,6 +529,7 @@ match stage:
         if zones_txt_path.exists():
             preset = '4'
             output_file = output_dir / f"{src_file.stem}_finalpass.mkv"
+            tmp_dir = output_dir / "final_temp"
             final_pass(src_file, output_file, tmp_dir, preset, crf, workers, zones_txt_path)
         else:
             print(f"Zones file not found at {zones_txt_path}. Final pass encode skipped.")
@@ -548,6 +551,7 @@ match stage:
         if zones_txt_path.exists():
             preset = '4'
             output_file = output_dir / f"{src_file.stem}_finalpass.mkv"
+            tmp_dir = output_dir / "final_temp"
             final_pass(src_file, output_file, tmp_dir, preset, crf, workers, zones_txt_path)
         else:
             print(f"Zones file not found at {zones_txt_path}. Final pass encode skipped.")
