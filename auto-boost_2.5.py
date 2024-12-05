@@ -523,7 +523,13 @@ match stage:
         metrics = int(args.metrics)
         calculate_metrics(src_file, output_file, tmp_dir, ranges, skip, metrics)
         zones = int(args.zones)
-        calculate_zones(tmp_dir, ranges, zones, crf)
+        zones_txt_path = calculate_zones(tmp_dir, ranges, zones, crf)  # Use the returned path
+        if zones_txt_path.exists():
+            preset = '4'
+            output_file = output_dir / f"{src_file.stem}_finalpass.mkv"
+            final_pass(src_file, output_file, tmp_dir, preset, crf, workers, zones_txt_path)
+        else:
+            print(f"Zones file not found at {zones_txt_path}. Final pass encode skipped.")
     case 1:
         workers = args.workers
         crf = float(args.quality)
