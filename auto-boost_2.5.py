@@ -22,13 +22,7 @@ NULL_DEVICE = 'NUL' if IS_WINDOWS else '/dev/null'
 if shutil.which("av1an") is None:
     raise FileNotFoundError("av1an not found, exiting")
 
-if shutil.which("turbo-metrics") is None:
-    print("turbo-metrics not found, defaulting to vs-zip")
-    ssimu2zig = True
-    default_skip = 3
-else:
-    ssimu2zig = False
-    default_skip = 1
+default_skip = 3
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--stage", help = "Select stage: 1 = encode, 2 = calculate metrics, 3 = generate zones | Default: all", default=0)
@@ -39,7 +33,8 @@ parser.add_argument("-d", "--deviation", help = "Maximum CRF change from origina
 parser.add_argument("-p", "--preset", help = "Fast encode preset | Default: 9", default=9)
 parser.add_argument("-w", "--workers", help = "Number of av1an workers | Default: amount of physical cores", default=psutil.cpu_count(logical=False))
 parser.add_argument("-m", "--metrics", help = "Select metrics: 1 = SSIMU2, 2 = XPSNR, 3 = Both | Default: 1", default=1)
-parser.add_argument("-S", "--skip", help = "SSIMU2 skip value, every nth frame's SSIMU2 is calculated | Default: 1 for turbo-metrics, 3 for vs-zip")
+parser.add_argument("--method", help = "Select metrics: vship or vszip", default=vship)
+parser.add_argument("-S", "--skip", help = "SSIMU2 skip value, every nth frame's SSIMU2 is calculated | Default: 3", default=default_skip)
 parser.add_argument("-z", "--zones", help = "Zones calculation method: 1 = SSIMU2, 2 = XPSNR, 3 = Multiplication, 4 = Lowest Result | Default: 1", default=1)
 parser.add_argument("-a", "--aggressive", action='store_true', help = "More aggressive boosting | Default: not active")
 args = parser.parse_args()
@@ -50,7 +45,7 @@ tmp_dir = Path(args.temp).resolve() if args.temp is not None else output_dir / s
 output_file = output_dir / f"{src_file.stem}_fastpass.mkv"
 scenes_file = tmp_dir / "scenes.json"
 br = float(args.deviation)
-skip = int(args.skip) if args.skip is not None else default_skip
+skip = int(args.skip)
 aggressive = args.aggressive
 
 def get_ranges(scenes: str) -> list[int]:
@@ -115,75 +110,7 @@ def fast_pass(
        print(f"Av1an encountered an error:\n{e}")
        exit(1)
 
-def turbo_metrics(
-    source: str, distorted: str, every: int
-) -> subprocess.CompletedProcess:
-    """
-    Compare two files with SSIMULACRA2 using turbo-metrics.
-
-    :param source: path to source file
-    :type source: str
-    :param distorted: path to distorted file
-    :type distorted: str
-    :param every: compare every X frames
-    :type every: int
-
-    :return: completed process
-    :rtype: subprocess.CompletedProcess
-    """
-
-    turbo_cmd = [
-        "turbo-metrics",
-        "-m",
-        "ssimulacra2",
-        "--output",
-        "csv",
-    ]
-
-    if every > 1:
-        turbo_cmd.append("--every")
-        turbo_cmd.append(str(every))
-
-    turbo_cmd.append(source)
-    turbo_cmd.append(distorted)
-
-    return subprocess.run(
-        turbo_cmd,
-        capture_output=True,
-        text=True,
-    )
-
 def calculate_ssimu2(src_file, enc_file, ssimu2_txt_path, ranges, skip):
-    if not ssimu2zig:  # Try turbo-metrics first if ssimu2zig is False
-        turbo_metrics_run = turbo_metrics(src_file, enc_file, skip)
-        if turbo_metrics_run.returncode == 0:  # If turbo-metrics succeeds
-            with ssimu2_txt_path.open("w") as file:
-                file.write(f"skip: {skip}\n")
-            frame = 0
-            # for whatever reason, turbo-metrics in csv mode dumps the entire scores to stdout at the end even though it prints them live to stdout.
-            # so we need to see if we've seen ``ssimulacra2`` before and if we have, ignore anything after the second one.
-            ignore_end_barf = False
-            for line in turbo_metrics_run.stdout.splitlines():
-                # set ignore_end_barf to true as this is the first "ssimulacra2" line
-                if line == "ssimulacra2" and not ignore_end_barf:
-                    ignore_end_barf = True
-                # break the loop as we've encountered the second "ssimulacra2" line so we don't get a dupe of the scores.
-                elif line == "ssimulacra2" and ignore_end_barf:
-                    break
-                # assume everything not "ssimulacra2" is a score.
-                if line != "ssimulacra2":
-                    frame += 1
-                    with ssimu2_txt_path.open("a") as file:
-                        file.write(f"{frame}: {float(line)}\n")
-            return  # Exit if turbo-metrics succeeded
-        else:
-            print(f"Turbo Metrics exited with code: {turbo_metrics_run.returncode}")
-            print(turbo_metrics_run.stdout)
-            print(turbo_metrics_run.stderr)
-            print("Falling back to vs-zip")
-            skip = int(args.skip) if args.skip is not None else 3
-
-    # If ssimu2zig is True or turbo-metrics failed, use vs-zip
     is_vpy = os.path.splitext(os.path.basename(src_file))[1] == ".vpy"
     vpy_vars = {}
     if is_vpy:
@@ -204,13 +131,17 @@ def calculate_ssimu2(src_file, enc_file, ssimu2_txt_path, ranges, skip):
         for i in range(len(ranges) - 1):
             cut_source_clip = source_clip[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=1)
             cut_encoded_clip = encoded_clip[ranges[i]:ranges[i+1]].std.SelectEvery(cycle=skip, offsets=1)
-            result = core.vszip.Metrics(cut_source_clip, cut_encoded_clip, mode=0)
+            if args.method == 'vship':
+                result = core.vship.SSIMULACRA2(cut_source_clip, cut_encoded_clip)
+            else:
+                result = core.vszip.Metrics(cut_source_clip, cut_encoded_clip, mode=0)
             for index, frame in enumerate(result.frames()):
                 iter += 1
                 score = frame.props['_SSIMULACRA2']
                 with ssimu2_txt_path.open("a") as file:
                     file.write(f"{iter}: {score}\n")
                 pbar.update(skip)
+
 def calculate_xpsnr(src_file, enc_path, xpsnr_txt_path):
     if IS_WINDOWS:
         xpsnr_txt_path = f"{src_file.stem}_xpsnr.log"
